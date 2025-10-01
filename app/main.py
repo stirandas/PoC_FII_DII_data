@@ -1,24 +1,18 @@
-from fastapi import FastAPI, HTTPException
-import os, httpx
+# app/main.py
+from fastapi import FastAPI  # Web framework entrypoint. [web:359]
+from app.services.fetch_json_data import get_fiidii_trade_json, NseClient  # Import service. [web:347]
 
-app = FastAPI(title="POC backend")
+app = FastAPI()  # Create the ASGI app. [web:359]
 
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
+# Simple endpoint that runs a one-shot fetch each time it's called.
+@app.get("/fiidii")
+def fiidii_snapshot():
+    return get_fiidii_trade_json()  # Quick path for manual checks and dashboards. [web:347]
 
-@app.post("/run")
-async def run():
-    return {"success": True, "details": []}
+# Reusable client if multiple endpoints need NSE data during the app lifetime.
+client = NseClient()  # Construct once at startup. [web:347]
+client.boot_session()  # Warm cookies once, reuse for better stability. [web:336][web:335]
 
-@app.post("/notify")
-async def notify():
-    chat_id = os.getenv("CHAT_ID")
-    bot_token = os.getenv("BOT_TOKEN")
-    if not chat_id or not bot_token:
-        raise HTTPException(status_code=400, detail="CHAT_ID or BOT_TOKEN missing")
-    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    async with httpx.AsyncClient(timeout=20) as client:
-        r = await client.post(url, json={"chat_id": chat_id, "text": "Hello"})
-        r.raise_for_status()
-        return r.json()
+@app.get("/fiidii/reuse")
+def fiidii_snapshot_reuse():
+    return client.get_fiidii_trade()  # Avoids repeated warm-ups under load. [web:336]

@@ -1,5 +1,7 @@
 # file: scripts/db_conn_check.py
 import os, psycopg
+from dotenv import load_dotenv
+load_dotenv()
 
 DATABASE_URL = os.environ["DATABASE_URL"]  # from .env
 

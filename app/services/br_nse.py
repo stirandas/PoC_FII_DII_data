@@ -99,7 +99,7 @@ def main():
             if not data:
                 raise RuntimeError("Target table empty or not found")
 
-            #print(json.dumps(data, indent=2, ensure_ascii=False))
+            print(json.dumps(data, indent=2, ensure_ascii=False))
         finally:
             try:
                 browser.close()

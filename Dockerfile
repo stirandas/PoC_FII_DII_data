@@ -23,8 +23,6 @@ RUN pip install uvicorn[standard]
 
 # Copy the rest of app
 COPY app app
-COPY alembic alembic
-COPY alembic.ini .
 COPY pyproject.toml .
 COPY init.sh .
 

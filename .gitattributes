@@ -1,0 +1,32 @@
+# Normalize text and force LF universally (Git 2.10+ supports eol with text=auto)
+# I'm adding this to avoid issues with Windows users committing CRLF line endings
+# This is especially important for shell scripts and Dockerfiles. Absence of this could hamper portability.
+* text=auto eol=lf
+
+# Python and config
+*.py            text eol=lf
+*.pyi           text eol=lf
+*.toml          text eol=lf
+*.ini           text eol=lf
+*.cfg           text eol=lf
+*.txt           text eol=lf
+*.md            text eol=lf
+LICENSE         text eol=lf
+
+# Shell and runtime config (Linux container-safe)
+*.sh            text eol=lf
+.env            text eol=lf
+*.env           text eol=lf
+*.conf          text eol=lf
+
+# Docker files
+Dockerfile      text eol=lf
+*.dockerfile    text eol=lf
+docker-compose.yml   text eol=lf
+docker-compose.yaml  text eol=lf
+compose.yml          text eol=lf
+compose.yaml         text eol=lf
+
+# YAML generally
+*.yml           text eol=lf
+*.yaml          text eol=lf

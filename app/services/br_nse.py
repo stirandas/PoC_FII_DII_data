@@ -64,6 +64,7 @@ def main():
     with sync_playwright() as p:
         # Try Firefox first to avoid Chromium HTTP/2 quirks
         browser = p.firefox.launch(headless=True)
+        #print("after browser launch")
         try:
             context = browser.new_context(locale="en-US")
             page = context.new_page()
@@ -76,25 +77,29 @@ def main():
             # Wait for the header text or a key phrase from the page
             try:
                 page.wait_for_selector(f"text={HEADER_SNIPPET}", timeout=30000)
+                #print("Header text found")
             except PWTimeout:
                 # Fallback: wait for a more generic keyword likely present on the page
                 page.wait_for_selector("text=FII/FPI", timeout=30000)
+                #print("Fallback header text found")
 
             # Small settle time
             time.sleep(1.5)
 
             data = page.evaluate(JS_FIND_PARSE, HEADER_SNIPPET)
+            #print("After first JS evaluation")
             if isinstance(data, str) and data.startswith("JSERROR:"):
                 # Retry once after a longer wait to allow late rendering
                 time.sleep(2.5)
                 data = page.evaluate(JS_FIND_PARSE, HEADER_SNIPPET)
+                #print("After retry JS evaluation")
 
             if isinstance(data, str) and data.startswith("JSERROR:"):
                 raise RuntimeError(f"Page parse error: {data}")
             if not data:
                 raise RuntimeError("Target table empty or not found")
 
-            print(json.dumps(data, indent=2, ensure_ascii=False))
+            #print(json.dumps(data, indent=2, ensure_ascii=False))
         finally:
             try:
                 browser.close()

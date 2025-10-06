@@ -55,7 +55,14 @@ def session_scope():
     finally:
         s.close()
 
-def insert_eq_data(payload: EqPayload) -> TNseFiiDiiEqData:
+
+from sqlalchemy.exc import IntegrityError
+
+def insert_eq_data(payload: EqPayload) -> bool:
+    """Attempt to insert; return True on success.
+    On any primary key/unique-like collision, return False and exit gracefully.
+    """
+
     def _net(buy: Decimal | None, sell: Decimal | None) -> Decimal | None:
         if buy is None or sell is None:
             return None
@@ -65,15 +72,19 @@ def insert_eq_data(payload: EqPayload) -> TNseFiiDiiEqData:
     fii_net = payload["fii_net"] if payload["fii_net"] is not None else _net(payload["fii_buy"], payload["fii_sell"])
 
     with session_scope() as s:
-        row = TNseFiiDiiEqData(
-            run_dt=payload["run_dt"],
-            dii_buy=payload["dii_buy"],
-            dii_sell=payload["dii_sell"],
-            dii_net=dii_net,
-            fii_buy=payload["fii_buy"],
-            fii_sell=payload["fii_sell"],
-            fii_net=fii_net,
-        )
-        s.add(row)
-        s.flush()  # PK set
-        return row
+        try:
+            row = TNseFiiDiiEqData(
+                run_dt=payload["run_dt"],
+                dii_buy=payload["dii_buy"],
+                dii_sell=payload["dii_sell"],
+                dii_net=dii_net,
+                fii_buy=payload["fii_buy"],
+                fii_sell=payload["fii_sell"],
+                fii_net=fii_net,
+            )
+            s.add(row)
+            s.flush()
+            return True
+        except IntegrityError:
+            s.rollback()
+            return False

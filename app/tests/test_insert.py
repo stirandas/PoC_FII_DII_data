@@ -1,6 +1,6 @@
-# app/tests/test_insert.py
-from sqlalchemy.exc import IntegrityError  # for PK violations [web:437]
+from sqlalchemy.exc import IntegrityError  # for non-PK integrity errors
 from app.services.ins_data import transform_rows, insert_eq_data
+
 
 def main():
     json_data = [
@@ -11,11 +11,15 @@ def main():
     payload = transform_rows(json_data)
 
     try:
-        row = insert_eq_data(payload)
-        print("Inserted:", row.run_dt, row.dii_buy, row.dii_sell, row.dii_net, row.fii_buy, row.fii_sell, row.fii_net)
+        inserted = insert_eq_data(payload)  # now returns bool
+        if inserted:
+            print("Inserted: True")
+        else:
+            print("Insert skipped: primary key already exists for this run_dt.")
     except IntegrityError as err:
-        # Short, clear message without a long traceback
-        print("Insert skipped: primary key already exists for this run_dt.", str(err.orig))  # concise [web:433][web:437])
+        # For integrity errors other than primary key/unique collision
+        print("Insert failed due to integrity error:", str(err))
+
 
 if __name__ == "__main__":
     main()

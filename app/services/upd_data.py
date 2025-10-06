@@ -23,4 +23,5 @@ def touch_timestamp(run_dt: date) -> int:
             text("UPDATE t_nse_fii_dii_eq_data SET iu_ts = now() WHERE run_dt = :d"),
             {"d": run_dt},
         )
-        return res.rowcount
+        #return res.rowcount   #Only for testing
+        return None 

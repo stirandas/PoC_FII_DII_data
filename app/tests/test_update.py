@@ -3,7 +3,8 @@ from datetime import date
 from app.services.upd_data import touch_timestamp
 
 def main():
-    run_dt = date(2025, 10, 3)  # pick the target PK date
+    #run_dt = date(2025, 10, 3)  # pick the target PK date
+    run_dt = "06-Oct-2025"
     count = touch_timestamp(run_dt)
     if count == 1:
         print("Timestamp updated for", run_dt)

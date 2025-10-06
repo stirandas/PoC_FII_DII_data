@@ -1,18 +1,40 @@
 # app/main.py
-from fastapi import FastAPI  # Web framework entrypoint. [web:359]
-from app.services.fetch_json_data import get_fiidii_trade_json, NseClient  # Import service. [web:347]
+#from fastapi import FastAPI  # Web framework entrypoint. [web:359]
+from app.services.br_nse import fetch_json_data  
+import json
 
-app = FastAPI()  # Create the ASGI app. [web:359]
+#app = FastAPI()  # Create the ASGI app. [web:359]
 
-# Simple endpoint that runs a one-shot fetch each time it's called.
-@app.get("/fiidii")
-def fiidii_snapshot():
-    return get_fiidii_trade_json()  # Quick path for manual checks and dashboards. [web:347]
+def main_script():
+    json_data = fetch_json_data()  # Call the function to fetch data
+    print(json.dumps(json_data, indent=2, ensure_ascii=False))
 
-# Reusable client if multiple endpoints need NSE data during the app lifetime.
-client = NseClient()  # Construct once at startup. [web:347]
-client.boot_session()  # Warm cookies once, reuse for better stability. [web:336][web:335]
+if __name__ == "__main__":
+    main_script()
 
-@app.get("/fiidii/reuse")
-def fiidii_snapshot_reuse():
-    return client.get_fiidii_trade()  # Avoids repeated warm-ups under load. [web:336]
+
+# app/main.py
+from datetime import date
+from decimal import Decimal
+
+from app.services.insert_eq_data import insert_eq_data
+from app.services.update_eq_data import update_eq_data
+
+def main():
+    # insert
+    insert_eq_data(
+        run_dt=date(2025, 10, 3),
+        dii_buy=Decimal("13448.61"),
+        dii_sell=Decimal("12920.13"),
+        fii_buy=Decimal("16496.43"),
+        fii_sell=Decimal("17999.55"),
+    )
+
+    # update
+    update_eq_data(
+        run_dt=date(2025, 10, 3),
+        dii_buy=Decimal("13450.00"),
+    )
+
+if __name__ == "__main__":
+    main()

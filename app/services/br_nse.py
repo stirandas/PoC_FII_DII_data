@@ -1,13 +1,16 @@
+
+"""The Playwright scraper navigates to the NSE page, waits for a header text, evaluates a DOM-walking JS function to find the first table after that header, 
+parses the thead/tbody into a list of dict rows, and returns that JSON; it retries once if the table isn’t ready yet. 
+"""
+
 from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 import json
 import time
-import os
 
 NSE_URL = "https://www.nseindia.com/reports/fii-dii"
 HEADER_SNIPPET = "FII/FPI & DII trading activity on NSE in Capital Market Segment"
 
 # Optional: set HTTPS proxy via env if needed for WAF/network stability
-# os.environ["HTTPS_PROXY"] = "http://user:pass@host:port"
 
 JS_FIND_PARSE = """
 (headerText) => {
@@ -60,46 +63,47 @@ JS_FIND_PARSE = """
 }
 """
 
-def main():
+def fetch_json_data():
     with sync_playwright() as p:
         # Try Firefox first to avoid Chromium HTTP/2 quirks
         browser = p.firefox.launch(headless=True)
         #print("after browser launch")
         try:
+            #print("insider try")
             context = browser.new_context(locale="en-US")
             page = context.new_page()
             # Longer timeouts for slow loads
-            page.set_default_navigation_timeout(120000)
-            page.set_default_timeout(120000)
+            page.set_default_navigation_timeout(10000)
+            page.set_default_timeout(10000)
 
             # Navigate and wait for any distinctive text on the page body instead of table visibility
             page.goto(NSE_URL, wait_until="domcontentloaded")
             # Wait for the header text or a key phrase from the page
             try:
-                page.wait_for_selector(f"text={HEADER_SNIPPET}", timeout=30000)
+                page.wait_for_selector(f"text={HEADER_SNIPPET}", timeout=8000)
                 #print("Header text found")
             except PWTimeout:
                 # Fallback: wait for a more generic keyword likely present on the page
-                page.wait_for_selector("text=FII/FPI", timeout=30000)
+                page.wait_for_selector("text=FII/FPI", timeout=8000)
                 #print("Fallback header text found")
 
             # Small settle time
-            time.sleep(1.5)
+            time.sleep(1)
 
             data = page.evaluate(JS_FIND_PARSE, HEADER_SNIPPET)
             #print("After first JS evaluation")
+            #print(data)
             if isinstance(data, str) and data.startswith("JSERROR:"):
                 # Retry once after a longer wait to allow late rendering
                 time.sleep(2.5)
                 data = page.evaluate(JS_FIND_PARSE, HEADER_SNIPPET)
-                #print("After retry JS evaluation")
+                #print("inside if isinstance ", data)
 
             if isinstance(data, str) and data.startswith("JSERROR:"):
                 raise RuntimeError(f"Page parse error: {data}")
             if not data:
                 raise RuntimeError("Target table empty or not found")
-
-            print(json.dumps(data, indent=2, ensure_ascii=False))
+            return(data)
         finally:
             try:
                 browser.close()
@@ -107,4 +111,4 @@ def main():
                 pass
 
 if __name__ == "__main__":
-    main()
+    fetch_json_data()

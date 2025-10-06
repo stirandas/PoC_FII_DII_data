@@ -1,4 +1,4 @@
-# file: scripts/bot_check.py
+# app/tests/test_bot.py
 import os
 import socket
 from datetime import datetime

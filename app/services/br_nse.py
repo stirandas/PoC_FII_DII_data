@@ -1,114 +1,140 @@
-
-"""The Playwright scraper navigates to the NSE page, waits for a header text, evaluates a DOM-walking JS function to find the first table after that header, 
-parses the thead/tbody into a list of dict rows, and returns that JSON; it retries once if the table isn’t ready yet. 
-"""
-
-from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
-import json
+# app/services/br_nse.py
+"""Robust Playwright scraper for NSE FII/DII table with scoped waits and HTTP/2 fallbacks."""
+from __future__ import annotations
+from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout, Page
 import time
 
 NSE_URL = "https://www.nseindia.com/reports/fii-dii"
-HEADER_SNIPPET = "FII/FPI & DII trading activity on NSE in Capital Market Segment"
+HEADER_TEXT = "FII/FPI & DII trading activity on NSE in Capital Market Segment"
 
-# Optional: set HTTPS proxy via env if needed for WAF/network stability
+JS_PARSE_TABLE = (
+    "(el) => {\n"
+    "  const thead = el.querySelector('thead');\n"
+    "  const tbody = el.querySelector('tbody');\n"
+    "  if (!thead || !tbody) return [];\n"
+    "  const headers = Array.from(thead.querySelectorAll('th')).map(x => x.textContent.trim());\n"
+    "  const out = [];\n"
+    "  for (const tr of tbody.querySelectorAll('tr')) {\n"
+    "    const cells = Array.from(tr.querySelectorAll('td')).map(x => x.textContent.trim());\n"
+    "    if (cells.length === headers.length) {\n"
+    "      const row = {};\n"
+    "      headers.forEach((h, i) => row[h] = cells[i]);\n"
+    "      out.push(row);\n"
+    "    }\n"
+    "  }\n"
+    "  return out;\n"
+    "}"
+)
 
-JS_FIND_PARSE = """
-(headerText) => {
-  // Find an element whose text contains the headerText (case-sensitive)
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT, null);
-  const hits = [];
-  while (walker.nextNode()) {
-    const el = walker.currentNode;
-    const t = el.textContent ? el.textContent.trim() : "";
-    if (t.includes(headerText)) hits.push(el);
-  }
-  if (!hits.length) return "JSERROR:header-not-found";
+def _locate_table(page: Page):
+    """Return a Locator for the target table, using robust scoping and fallback."""
+    # Try role-based heading first (accessible name)
+    header = page.get_by_role("heading", name=HEADER_TEXT, exact=True)
+    try:
+        header.wait_for(timeout=12000)
+        region = header.locator("xpath=ancestor::*[self::section or self::div][position()<=3]").first
+        table = region.locator("table").first
+        table.wait_for(state="visible", timeout=10000)
+        return table
+    except Exception:
+        # Fallback: text-based anchor
+        try:
+            h2 = page.get_by_text(HEADER_TEXT, exact=True).first
+            h2.wait_for(timeout=8000)
+            region = h2.locator("xpath=ancestor::*[self::section or self::div][position()<=3]").first
+            table = region.locator("table").first
+            table.wait_for(state="visible", timeout=8000)
+            return table
+        except Exception:
+            # Final fallback: any visible table with proper thead/tbody and at least one row
+            table = page.locator("table").filter(
+                has=page.locator("thead th")
+            ).filter(
+                has=page.locator("tbody tr")
+            ).first
+            table.wait_for(state="visible", timeout=12000)
+            return table
 
-  function firstTableAfter(node) {
-    // Scan forward through DOM order to find first TABLE node
-    const it = document.createNodeIterator(document.body, NodeFilter.SHOW_ELEMENT);
-    let cur;
-    // advance to node
-    while ((cur = it.nextNode())) {
-      if (cur === node) break;
-    }
-    while ((cur = it.nextNode())) {
-      if (cur.tagName === "TABLE") return cur;
-    }
-    return null;
-  }
+def _scrape_with_page(page: Page):
+    # Navigate and settle
+    page.goto(NSE_URL, wait_until="domcontentloaded")
+    try:
+        page.wait_for_load_state("networkidle", timeout=15000)
+    except PWTimeout:
+        pass
 
-  let table = null;
-  for (const h of hits) {
-    table = firstTableAfter(h);
-    if (table) break;
-  }
-  if (!table) return "JSERROR:table-not-found";
+    table = _locate_table(page)
 
-  const thead = table.querySelector('thead');
-  const tbody = table.querySelector('tbody');
-  if (!thead || !tbody) return "JSERROR:thead-or-tbody-missing";
+    # Scoped waits to this specific table
+    thead_th = table.locator("thead th")
+    tbody_tr = table.locator("tbody tr")
+    thead_th.first.wait_for(timeout=12000)
+    try:
+        tbody_tr.first.wait_for(timeout=12000)
+    except Exception:
+        time.sleep(1.5)
+        tbody_tr.first.wait_for(timeout=8000)
 
-  const headers = Array.from(thead.querySelectorAll('th')).map(x => x.textContent.trim());
-  const out = [];
-  for (const tr of tbody.querySelectorAll('tr')) {
-    const cells = Array.from(tr.querySelectorAll('td')).map(x => x.textContent.trim());
-    if (cells.length === headers.length) {
-      const row = {};
-      headers.forEach((h, i) => row[h] = cells[i]);
-      out.push(row);
-    }
-  }
-  return out;
-}
-"""
+    handle = table.element_handle()
+    if not handle:
+        raise RuntimeError("Table handle not available")
+
+    data = page.evaluate(JS_PARSE_TABLE, handle)
+    if not data:
+        time.sleep(2.0)
+        data = page.evaluate(JS_PARSE_TABLE, handle)
+
+    if not data:
+        try:
+            page.keyboard.press("End"); time.sleep(1.5)
+            page.keyboard.press("Home"); time.sleep(1.0)
+        except Exception:
+            pass
+        data = page.evaluate(JS_PARSE_TABLE, handle)
+
+    if not data:
+        raise RuntimeError("Table located but empty after retries")
+
+    return data
 
 def fetch_json_data():
+    """Scrape and return the NSE FII/DII table as a list of dict rows."""
     with sync_playwright() as p:
-        # Try Firefox first to avoid Chromium HTTP/2 quirks
-        browser = p.firefox.launch(headless=True)
-        #print("after browser launch")
-        try:
-            #print("insider try")
-            context = browser.new_context(locale="en-US")
-            page = context.new_page()
-            # Longer timeouts for slow loads
-            page.set_default_navigation_timeout(10000)
-            page.set_default_timeout(10000)
-
-            # Navigate and wait for any distinctive text on the page body instead of table visibility
-            page.goto(NSE_URL, wait_until="domcontentloaded")
-            # Wait for the header text or a key phrase from the page
+        attempts = (
+            (p.chromium, {"headless": True, "args": ["--headless=new", "--disable-http2", "--disable-quic"]}),
+            (p.firefox, {"headless": True}),
+        )
+        last_err: Exception | None = None
+        for engine, launch_kwargs in attempts:
+            browser = engine.launch(**launch_kwargs)
             try:
-                page.wait_for_selector(f"text={HEADER_SNIPPET}", timeout=8000)
-                #print("Header text found")
-            except PWTimeout:
-                # Fallback: wait for a more generic keyword likely present on the page
-                page.wait_for_selector("text=FII/FPI", timeout=8000)
-                #print("Fallback header text found")
+                context = browser.new_context(
+                    locale="en-US",
+                    user_agent=(
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    ),
+                )
+                try:
+                    context.clear_cookies()
+                except Exception:
+                    pass
+                page = context.new_page()
+                page.set_default_navigation_timeout(30000)
+                page.set_default_timeout(30000)
 
-            # Small settle time
-            time.sleep(1)
-
-            data = page.evaluate(JS_FIND_PARSE, HEADER_SNIPPET)
-            #print("After first JS evaluation")
-            #print(data)
-            if isinstance(data, str) and data.startswith("JSERROR:"):
-                # Retry once after a longer wait to allow late rendering
-                time.sleep(2.5)
-                data = page.evaluate(JS_FIND_PARSE, HEADER_SNIPPET)
-                #print("inside if isinstance ", data)
-
-            if isinstance(data, str) and data.startswith("JSERROR:"):
-                raise RuntimeError(f"Page parse error: {data}")
-            if not data:
-                raise RuntimeError("Target table empty or not found")
-            return(data)
-        finally:
-            try:
-                browser.close()
-            except Exception:
-                pass
+                return _scrape_with_page(page)
+            except Exception as e:
+                last_err = e
+                time.sleep(1.0)
+            finally:
+                try:
+                    browser.close()
+                except Exception:
+                    pass
+        if last_err:
+            raise last_err
+        raise RuntimeError("Unknown error while scraping NSE table")
 
 if __name__ == "__main__":
-    fetch_json_data()
+    print(fetch_json_data())

@@ -18,9 +18,6 @@ RUN python -m venv /venv
 ENV PATH="/venv/bin:$PATH"
 RUN pip install -r requirements.txt
 
-# Install uvicorn server
-RUN pip install uvicorn[standard]
-
 # Copy the rest of app
 COPY app app
 COPY pyproject.toml .

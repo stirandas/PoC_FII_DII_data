@@ -3,10 +3,8 @@ from __future__ import annotations
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from dotenv import load_dotenv, find_dotenv
-
-# Load .env from project root
-load_dotenv(find_dotenv(usecwd=True))
+from dotenv import load_dotenv
+load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:

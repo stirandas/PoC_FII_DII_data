@@ -17,6 +17,7 @@ COPY --from=poetry /requirements.txt .
 RUN python -m venv /venv
 ENV PATH="/venv/bin:$PATH"
 RUN pip install -r requirements.txt
+RUN pip install playwright==1.55.0 && playwright install --with-deps chromium firefox
 
 # Copy the rest of app
 COPY app app

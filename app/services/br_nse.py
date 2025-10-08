@@ -4,8 +4,10 @@ from __future__ import annotations
 from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout, Page
 import time
 
+
 NSE_URL = "https://www.nseindia.com/reports/fii-dii"
 HEADER_TEXT = "FII/FPI & DII trading activity on NSE in Capital Market Segment"
+
 
 JS_PARSE_TABLE = (
     "(el) => {\n"
@@ -25,6 +27,7 @@ JS_PARSE_TABLE = (
     "  return out;\n"
     "}"
 )
+
 
 def _locate_table(page: Page):
     """Return a Locator for the target table, using robust scoping and fallback."""
@@ -52,8 +55,9 @@ def _locate_table(page: Page):
             ).filter(
                 has=page.locator("tbody tr")
             ).first
-            table.wait_for(state="visible", timeout=12000)
+            table.wait_for(state="visible", timeout=30000)
             return table
+
 
 def _scrape_with_page(page: Page):
     # Navigate and settle
@@ -63,7 +67,9 @@ def _scrape_with_page(page: Page):
     except PWTimeout:
         pass
 
+
     table = _locate_table(page)
+
 
     # Scoped waits to this specific table
     thead_th = table.locator("thead th")
@@ -75,14 +81,17 @@ def _scrape_with_page(page: Page):
         time.sleep(1.5)
         tbody_tr.first.wait_for(timeout=8000)
 
+
     handle = table.element_handle()
     if not handle:
         raise RuntimeError("Table handle not available")
+
 
     data = page.evaluate(JS_PARSE_TABLE, handle)
     if not data:
         time.sleep(2.0)
         data = page.evaluate(JS_PARSE_TABLE, handle)
+
 
     if not data:
         try:
@@ -92,10 +101,13 @@ def _scrape_with_page(page: Page):
             pass
         data = page.evaluate(JS_PARSE_TABLE, handle)
 
+
     if not data:
         raise RuntimeError("Table located but empty after retries")
 
+
     return data
+
 
 def fetch_json_data():
     """Scrape and return the NSE FII/DII table as a list of dict rows."""
@@ -123,6 +135,7 @@ def fetch_json_data():
                 page.set_default_navigation_timeout(30000)
                 page.set_default_timeout(30000)
 
+
                 return _scrape_with_page(page)
             except Exception as e:
                 last_err = e
@@ -135,6 +148,7 @@ def fetch_json_data():
         if last_err:
             raise last_err
         raise RuntimeError("Unknown error while scraping NSE table")
+
 
 if __name__ == "__main__":
     print(fetch_json_data())

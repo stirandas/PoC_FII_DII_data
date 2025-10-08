@@ -35,6 +35,5 @@ RUN chmod +x ./init.sh
 # Set ENTRYPOINT to always run init.sh
 ENTRYPOINT ["./init.sh"]
 
-# Set CMD to uvicorn
-# /venv/bin/uvicorn is used because from entrypoint script PATH is new
-CMD ["/venv/bin/uvicorn", "app.app_driver:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--loop", "uvloop"]
+# Run docker from entrypoint of PoC
+CMD ["/venv/bin/python","-m","app.app_driver"]

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import Date, Numeric
+from sqlalchemy import Date, Numeric, Column, DateTime
 
 class Base(DeclarativeBase):
     pass
@@ -18,3 +18,5 @@ class TNseFiiDiiEqData(Base):
     fii_buy: Mapped[Decimal | None] = mapped_column(Numeric(9, 2), nullable=True)
     fii_sell: Mapped[Decimal | None] = mapped_column(Numeric(9, 2), nullable=True)
     fii_net: Mapped[Decimal | None] = mapped_column(Numeric(7, 2), nullable=True)
+    i_ts = Column(DateTime(timezone=True))
+    u_ts = Column(DateTime(timezone=True))

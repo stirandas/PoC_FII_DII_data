@@ -1,11 +1,11 @@
 # app/tests/test_bot_json_msg.py
 from app.services.bot_json_msg import bot_json_msg, TelegramSendError
 
-def main():
+def bot_test():
     payload = [
         {
             "Category": "DII-test **",
-            "Date": "06-Oct-2025",
+            "Date": "01-Jan-2014",
             "Buy Value(₹ Crores)": "15,515.91",
             "Sell Value (₹ Crores)": "10,634.31",
             "Net Value (₹ Crores)": "4,881.60",
@@ -26,4 +26,4 @@ def main():
         print("Failed:", e)
 
 if __name__ == "__main__":
-    main()
+    bot_test()

@@ -5,8 +5,15 @@ from decimal import Decimal
 from typing import Any, TypedDict
 from contextlib import contextmanager
 
+import pytz
+from sqlalchemy.exc import IntegrityError
+
 from app.db import get_session
 from app.models import TNseFiiDiiEqData
+
+# Define IST timezone
+IST = pytz.timezone("Asia/Kolkata")
+
 
 class EqPayload(TypedDict):
     run_dt: date
@@ -16,6 +23,7 @@ class EqPayload(TypedDict):
     fii_buy: Decimal | None
     fii_sell: Decimal | None
     fii_net: Decimal | None
+
 
 def transform_rows(rows: list[dict[str, Any]]) -> EqPayload:
     dii_row = next((r for r in rows if r.get("Category", "").strip().startswith("DII")), None)
@@ -43,6 +51,7 @@ def transform_rows(rows: list[dict[str, Any]]) -> EqPayload:
         "fii_net": _to_decimal(fii_row.get("Net Value (₹ Crores)")),
     }
 
+
 @contextmanager
 def session_scope():
     s = get_session()
@@ -55,8 +64,6 @@ def session_scope():
     finally:
         s.close()
 
-
-from sqlalchemy.exc import IntegrityError
 
 def insert_eq_data(payload: EqPayload) -> bool:
     """Attempt to insert; return True on success.
@@ -71,6 +78,9 @@ def insert_eq_data(payload: EqPayload) -> bool:
     dii_net = payload["dii_net"] if payload["dii_net"] is not None else _net(payload["dii_buy"], payload["dii_sell"])
     fii_net = payload["fii_net"] if payload["fii_net"] is not None else _net(payload["fii_buy"], payload["fii_sell"])
 
+    # Generate IST timestamp for insertion
+    i_ts_ist = datetime.now(IST)
+
     with session_scope() as s:
         try:
             row = TNseFiiDiiEqData(
@@ -81,6 +91,7 @@ def insert_eq_data(payload: EqPayload) -> bool:
                 fii_buy=payload["fii_buy"],
                 fii_sell=payload["fii_sell"],
                 fii_net=fii_net,
+                i_ts=i_ts_ist,  # New IST timestamp column
             )
             s.add(row)
             s.flush()

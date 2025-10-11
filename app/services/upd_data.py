@@ -1,9 +1,12 @@
 # app/services/upd_data.py
 from __future__ import annotations
-from datetime import date
+from datetime import date, datetime
 from contextlib import contextmanager
 from sqlalchemy import text
 from app.db import get_session
+import pytz  # pip install pytz
+
+IST = pytz.timezone("Asia/Kolkata")
 
 @contextmanager
 def session_scope():
@@ -19,9 +22,9 @@ def session_scope():
 
 def touch_timestamp(run_dt: date) -> int:
     with session_scope() as s:
-        res = s.execute(
-            text("UPDATE t_nse_fii_dii_eq_data SET iu_ts = now() WHERE run_dt = :d"),
-            {"d": run_dt},
+        now_ist = datetime.now(IST)
+        s.execute(
+            text("UPDATE t_nse_fii_dii_eq_data SET u_ts = :now_ist WHERE run_dt = :d"),
+            {"now_ist": now_ist, "d": run_dt},
         )
-        #return res.rowcount   #Only for testing
-        return None 
+        return None

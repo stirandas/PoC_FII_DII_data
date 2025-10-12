@@ -1,0 +1,43 @@
+# =============================================================================
+# Cloud Scheduler Job YAML: nse_fii_dii_job_schedule.yaml
+# =============================================================================
+# Purpose:
+#   Schedule the Cloud Run Job 'nse-fii-dii-data-poc-gcloud-image' to run every
+#   15 minutes between 5 PM and 8 PM IST on weekdays.
+#
+# Assumptions / Prerequisites:
+#   1. Cloud Run Job 'nse-fii-dii-data-poc-gcloud-image' is already deployed.
+#   2. Service account used by Cloud Scheduler exists:
+#        poc-svc-ac@nse-fii-dii-poc.iam.gserviceaccount.com
+#   3. Service account has the following IAM roles:
+#        - roles/run.invoker
+#        - roles/run.developer
+#        - roles/iam.serviceAccountTokenCreator
+#   4. Project: nse-fii-dii-poc, Region: asia-south1
+#   5. Scheduler must use OAuth (OIDC tokens will NOT work for Jobs API).
+#
+# Constraints / Limitations:
+#   - Cloud Run Jobs cannot be invoked via OIDC token; OAuth access token is required.
+#   - Cloud Run Jobs are private endpoints; cannot be made publicly accessible.
+#   - Scheduler HTTP target must point to the Jobs API endpoint:
+#       https://<region>-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/<project>/jobs/<job-name>:run
+#   - Body can be minimal (empty JSON) if your job does not require input: {}
+#   - Authentication is mandatory even for private projects.
+#
+# Deployment Notes:
+#   - This YAML is declarative/documentation only.
+#   - Use gcloud commands or a deploy script to actually create/update the job.
+# =============================================================================
+
+name: nse_fii_dii_data_poc_job_schedule
+schedule: '*/15 17-20 * * 1-5'  # Every 15 minutes, 5 PM to 8 PM IST, weekdays
+timeZone: 'Asia/Calcutta'
+
+httpTarget:
+  uri: https://asia-south1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/nse-fii-dii-poc/jobs/nse-fii-dii-data-poc-gcloud-image:run
+  httpMethod: POST
+  headers:
+    Content-Type: application/json
+  body: "{}"
+  oauthToken:
+    serviceAccountEmail: poc-svc-ac@nse-fii-dii-poc.iam.gserviceaccount.com

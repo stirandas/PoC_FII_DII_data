@@ -1,6 +1,10 @@
 .git
+.gitignore
+.idea/
+.vscode
 __pycache__/
 *.pyc
+pycache/
 .venv/
 venv/
 .env
@@ -9,3 +13,11 @@ venv/
 dist/
 build/
 *.log
+docs/
+coverage.xml
+db_design.sql
+README.md
+LICENSE
+docker-compose.yml
+.pre-commit-config.yaml
+cloud-scheduler/
